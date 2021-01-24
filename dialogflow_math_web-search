@@ -1,0 +1,322 @@
+<?php
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
+
+$message= new \stdClass();
+//Default is here
+$exp="5!";
+$result="";
+$json=file_get_contents('php://input');
+$data = json_decode($json);
+
+$q = $data->queryResult->queryText;
+if(isset($data->queryResult->parameters->exp)){
+  // $result="What should I calculate?";
+    $exp=$data->queryResult->parameters->exp;
+    $exp=strtolower($exp);
+    $exp=str_replace("pi", M_PI, $exp);
+    $exp=str_replace("÷", "/", $exp);
+    $exp=str_replace("×", "*", $exp);
+    $exp=str_replace("^", "**", $exp);
+    $exp=str_replace("plus", "+", $exp);
+    $exp=str_replace("minus", "-", $exp);
+    $exp=str_replace("into", "*", $exp);
+    $exp=str_replace("times", "*", $exp);
+    $exp=str_replace("multiplied by", "*", $exp);
+    
+    //if(strpos($exp, "!")!==false){
+        
+    if(preg_match("/.*(factorial|!).*/i", $exp)){
+        if (preg_match('~[0-9]+~', $exp)) {
+            $exp=str_replace("!", "", $exp);
+            $exp=str_replace("factorial", "", $exp);
+            $exp=preg_replace("/[^ 0-9+*\/-]/", "", $exp);
+            $exp=str_replace("^", "**", $exp);
+           // $exp=str_replace("of", "", $exp);
+            $ev= eval("return " . $exp. " ;");
+            if($ev!="false"&&$ev!="null"){
+                $ans=1;
+                while($ev>0){
+                    $ans*=$ev;
+                    $ev-=1;
+                }
+                $result=$exp. "! is ".$ans;
+            }
+            else{
+                $result="What should I calculate exactly?";
+            }
+        }
+    
+    //preg match over
+    else if(preg_match("/.*[^0-9*\(\)\+\^!-].*/i", $exp)){
+        if(preg_match("/.*[0-9]+.*/", $exp)){
+        $exp=str_replace("raised to", "**",$exp);
+    $exp=str_replace("^", "**", $exp);
+    
+    $exp=preg_replace("/[a-zA-Z]+/", "", $exp);
+    $ev= eval("return " . $exp. " ;");
+    if($ev!="false"&&$ev!="null"){
+               
+                $result=$exp. " is ".$ev;
+            }
+            else{
+                $result="What should I calculate exactly?";
+            }
+    }
+    }
+    else{
+            $search=$exp;
+            $search=strtolower($search);
+    $search=str_replace("for", "", $search);
+    $search=preg_replace("/for|the|from|about|with/i", "", $search);
+    $result="Sorry, I cannot search the web for ".$search;
+    if(strpos($search, "recipe")){
+        $dish=$search;
+    $dish=$data->queryResult->parameters->dish;
+    $result="Here are some recipies for".$dish.":\n ";
+    $url="http://www.recipepuppy.com/api/?q=".urlencode($dish);
+    $body = file_get_contents($url);
+    $json = json_decode($body);
+    foreach($json->results as $rec){
+        $result.="\n".$rec->title."\n".$rec->href;
+    }
+    }
+    else{
+    /*$url = "https://api.duckduckgo.com/?q=".urlencode($search)."&format=json&pretty=1&no_html=1&skip_disambig=1";
+    $body = file_get_contents($url);
+    $json = json_decode($body);
+    $results=$json->AbstractText;
+    if($results!=""){
+        $result="Here are the results for ".$search.":\n ".$results;
+    }*/
+    $result="I didn't understand. Can you rephrase youer question?";
+    }
+        }
+    }
+    else{
+        if (preg_match('~[0-9]+~', $exp)) {
+    $result=$exp." is ";
+    $answer=eval("return ".$exp.";");
+    if($answer!="false"&&$answer!="null"){
+    $result.=$answer;
+    }
+    else{
+        $result="What should I calculate exactly?";
+    }
+        }
+        else{
+           // if(isset($data->intentDetectionConfidence)){
+            //if($data->intentDetectionConfidence>0.5){
+            $search=$exp;
+            $search=strtolower($search);
+    $search=str_replace("for", "", $search);
+    $search=preg_replace("/for|the|from|about|with/i", "", $search);
+    $result="Sorry, I cannot search the web for ".$search;
+    $url = "https://api.duckduckgo.com/?q=".urlencode($search)."&format=json&pretty=1&no_html=1&skip_disambig=1";
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,$url);
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json=json_decode($body1);
+    $results=$json->AbstractText;
+        if($results!=""){
+                $result="Here are the results for ".$search.":\n ".$results;
+            }
+            /*else{
+                 $url = "https://api.jikan.moe/v3/search/anime?q=".urlencode($search);
+                $body = file_get_contents($url);
+                $json = json_decode($body);
+                $ani= $json->results;
+                $result="Here are the search results for ".$search;
+                foreach($ani as $ae){
+                    $result.=$ae->title.$ae->synopsis.$ae->url."\n";
+                }
+            }*/
+       // }
+       // }
+        }
+    }
+}
+else if(isset($data->queryResult->parameters->q)){
+    $search=$data->queryResult->parameters->q;
+   // $result="Sorry, I cannot search the web for ".$search;
+     $search=strtolower($search);
+    $search=str_replace("for", "", $search);
+    $search=preg_replace("/for|the|from|about|with/i", "", $search);
+    //$result="Sorry, I cannot search the web for ".$search;
+    $url = "https://api.duckduckgo.com/?q=".urlencode($search)."&format=json&pretty=1&no_html=1&skip_disambig=1";
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,$url);
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json=json_decode($body1);
+    $results=$json->AbstractText;
+        if($results!=""){
+                $result="Here are the results for ".$search.":\n ".$results;
+            }
+            else
+            exit();
+}
+
+else if(isset($data->queryResult->parameters->song)){
+    $song=$data->queryResult->parameters->song;
+    $artist=$data->queryResult->parameters->artist;
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,"https://api.lyrics.ovh/v1/".urlencode($artist)."/".urlencode($song));
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json1=json_decode($body1);
+curl_close($curl_handle);
+
+if($json1->lyrics!=""){
+    $result="Here are the lyrics for ".$song. " by ". $artist."\n";
+    $result.=$json1->lyrics;
+}
+else{
+    $result="Could not find lyrics for ".$song." by ".$artist;
+    $result.="\n The song does not exist or you have misspelt something, or the lyrics are just not available. Check this list of songs (will not guarantee the availability of lyrics:\n";
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,"http://musicbrainz.org/ws/2/recording/?fmt=json&query=".urlencode($song));
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_ENCODING, '');
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json1=json_decode($body1);
+curl_close($curl_handle);
+    foreach($json1->recordings as $rec){
+        $result.=$rec->title." by ".$rec->{'artist-credit'}[0]->name."\n";
+    }
+}
+}
+else if(isset($data->queryResult->parameters->dish)){
+    $dish=$data->queryResult->parameters->dish;
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,"http://www.recipepuppy.com/api/?q=".urlencode($dish));
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json1=json_decode($body1);
+curl_close($curl_handle);
+if($json1->results!=""){
+    $result="Here are some recipes for ".$dish.":\n";
+    foreach($json1->results as $res){
+        $result.="\n".$res->title."\nIngredients: ".$res->ingredients."\n".$res->href;
+    }
+}
+else {
+    $result="Could not find recipes for ".$dish;
+}
+}
+//dictionary here
+else if(isset($data->queryResult->parameters->d)){
+    $word=$data->queryResult->parameters->d;
+    $word=preg_replace("/[^a-z,]/i", "", $word);
+    $p="ml";
+    $itis="synonyms for ";
+    if(isset($data->queryResult->parameters->dictionary)){
+        $s=$data->queryResult->parameters->dictionary;
+        if (strpos($s, "syn")!==false||strpos($s, "mean")!==false){
+            $p="ml";
+        }
+        else if (strpos($s, "rhym")!==false){
+            $p="rel_rhy";
+            $itis="rhyming words for ";
+        }
+        else if (strpos($s, "antonym")!==false||strpos($s, "opposite")!==false){
+            $p="rel_ant";
+            $itis="antonyms for ";
+        }
+        else if(strpos($s, "sound")!==false){
+            $p="sl";
+            $itis="words sounding similar to ";
+        }
+        else if(strpos($s, "spell")!==false){
+            $p="sp";
+            $itis="words spelled like ";
+        }
+    }
+    $url = "https://api.datamuse.com/words/?".$p. "=".$word;
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,$url);
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json=json_decode($body1);
+curl_close($curl_handle);
+    $result="Here are the ".$itis. $word.":\n \n";
+    $comma=0;
+    foreach ($json as $io){
+        if($comma==0){
+    $result.=$io->word;
+    $comma=1;
+        }
+    else{
+        $result.=", ".$io->word;
+    }
+    }
+}//dictionary over
+else if(isset($data->queryResult->parameters->givenname)){
+    //echo "name";
+    $name=$data->queryResult->parameters->givenname->name;
+   // $url="https://api.genderize.io/?name=".$name;
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,"https://api.genderize.io/?name=".$name);
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json=json_decode($body1);
+curl_close($curl_handle);
+
+    if($json->gender!=""){
+        $result="Based on your name (".$name.") you are a ".$json->gender." with a probability of ".$json->probability;
+    }
+    else{
+        $result="Could not guess your gender.";
+    }
+    $curl_handle=curl_init();
+curl_setopt($curl_handle, CURLOPT_URL,"https://api.nationalize.io/?name=".$name);
+curl_setopt($curl_handle, CURLOPT_CONNECTTIMEOUT, 2);
+curl_setopt($curl_handle, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl_handle, CURLOPT_USERAGENT, 'Your application name');
+$body1 = curl_exec($curl_handle);
+$json=json_decode($body1);
+curl_close($curl_handle);
+    if(!empty($json->country)){
+        $result.="\n You may be from ";
+        foreach($json->country as $ctn){
+            $result.=$ctn->country_id." (".($ctn->probability*100)."%) \n";
+        }
+    }
+}
+else{
+    //$result="What should I calculate here?";
+}
+
+$text=new \stdClass();
+$text2=new \stdClass();
+
+$text2->text=array($result);
+$text->text=$text2;
+$message->fulfillmentMessages=array($text);
+
+//$q = $data->queryResult->queryText;
+if(trim($result)=="is"){
+                    $result="";
+                    exit();
+                }
+$rf=new \stdClass();
+$rf->data=array($message);
+$rf=$message;
+echo json_encode($rf);
+?>
